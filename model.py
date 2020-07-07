@@ -11,13 +11,24 @@ import utils
 from arch import define_Gen, define_Dis, set_grad
 from torch.optim import lr_scheduler
 
+
+import os
+import torch
+from torch import nn
+from torch.autograd import Variable
+import torchvision
+import torchvision.datasets as dsets
+import torchvision.transforms as transforms
+import utils
+from arch import define_Gen, define_Dis
+
 '''
 Class for CycleGAN with train() as a member function
 
 '''
 class cycleGAN(object):
     def __init__(self,args):
-
+        print("Checkpoint directory {}".format(args.checkpoint_dir))
         # Define the network 
         #####################################################
         self.Gab = define_Gen(input_nc=3, output_nc=3, ngf=args.ngf, netG=args.gen_net, norm=args.norm, 
@@ -64,13 +75,31 @@ class cycleGAN(object):
 
 
     def train(self,args):
+        # Test input
+        transform_test = transforms.Compose(
+          [transforms.Resize((args.crop_height,args.crop_width)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
+
+        dataset_dirs = utils.get_testdata_link(args.dataset_dir)
+
+        a_test_data = dsets.ImageFolder(dataset_dirs['testA'], transform=transform_test)
+        b_test_data = dsets.ImageFolder(dataset_dirs['testB'], transform=transform_test)
+
+
+        a_test_loader = torch.utils.data.DataLoader(a_test_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
+        b_test_loader = torch.utils.data.DataLoader(b_test_data, batch_size=args.batch_size, shuffle=True, num_workers=4)
+
+
+
+
         # For transforming the input image
         transform = transforms.Compose(
             [transforms.RandomHorizontalFlip(),
-             transforms.Resize((args.load_height,args.load_width)),
-             transforms.RandomCrop((args.crop_height,args.crop_width)),
-             transforms.ToTensor(),
-             transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
+              transforms.Resize((args.load_height,args.load_width)),
+              transforms.RandomCrop((args.crop_height,args.crop_width)),
+              transforms.ToTensor(),
+              transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
 
         dataset_dirs = utils.get_traindata_link(args.dataset_dir)
 
@@ -195,7 +224,34 @@ class cycleGAN(object):
                                    'd_optimizer': self.d_optimizer.state_dict(),
                                    'g_optimizer': self.g_optimizer.state_dict()},
                                   '%s/latest.ckpt' % (args.checkpoint_dir))
+            # Save image current :
+            #######################################################################
+            """ run """
+            a_real_test = Variable(iter(a_test_loader).next()[0], requires_grad=True)
+            b_real_test = Variable(iter(b_test_loader).next()[0], requires_grad=True)
+            a_real_test, b_real_test = utils.cuda([a_real_test, b_real_test])
+                    
 
+            self.Gab.eval()
+            self.Gba.eval()
+
+            with torch.no_grad():
+                a_fake_test = self.Gab(b_real_test)
+                b_fake_test = self.Gba(a_real_test)
+                a_recon_test = self.Gab(b_fake_test)
+                b_recon_test = self.Gba(a_fake_test)
+
+            pic = (torch.cat([a_real_test, b_fake_test, a_recon_test, b_real_test, a_fake_test, b_recon_test], dim=0).data + 1) / 2.0
+
+            if not os.path.isdir(args.results_dir):
+                os.makedirs(args.results_dir)
+
+            torchvision.utils.save_image(pic  , args.results_dir+'/sample_{}.jpg'.format(epoch), nrow=3)
+
+
+
+            self.Gab.train()
+            self.Gba.train()
             # Update learning rates
             ########################
             self.g_lr_scheduler.step()
