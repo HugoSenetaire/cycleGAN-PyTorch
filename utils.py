@@ -40,14 +40,14 @@ def create_link(dataset_dir):
 
 def get_traindata_link(dataset_dir):
     dirs = {}
-    dirs['trainA'] = os.path.join(dataset_dir, 'ltrainA')
-    dirs['trainB'] = os.path.join(dataset_dir, 'ltrainB')
+    dirs['trainA'] = os.path.join(dataset_dir, 'trainA')
+    dirs['trainB'] = os.path.join(dataset_dir, 'trainB')
     return dirs
 
 def get_testdata_link(dataset_dir):
     dirs = {}
-    dirs['testA'] = os.path.join(dataset_dir, 'ltestA')
-    dirs['testB'] = os.path.join(dataset_dir, 'ltestB')
+    dirs['testA'] = os.path.join(dataset_dir, 'testA')
+    dirs['testB'] = os.path.join(dataset_dir, 'testB')
     return dirs
 
 
